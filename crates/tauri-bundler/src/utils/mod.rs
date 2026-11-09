@@ -14,10 +14,8 @@ use std::{
 pub mod fs_utils;
 pub mod http_utils;
 
-/// Returns true if the path has a filename indicating that it is a high-density
-/// "retina" icon.  Specifically, returns true the file stem ends with
-/// "@2x" (a convention specified by the [Apple developer docs](
-/// <https://developer.apple.com/library/mac/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Optimizing/Optimizing.html>)).
+/// Returns true if the path has a filename indicating that it is a high-density "retina" icon.
+/// Specifically, returns true the file stem ends with "@2x" (a convention specified by the [Apple developer docs]( <https://developer.apple.com/library/mac/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Optimizing/Optimizing.html>)).
 #[allow(dead_code)]
 pub fn is_retina(path: &Path) -> bool {
   path
@@ -28,8 +26,7 @@ pub fn is_retina(path: &Path) -> bool {
 }
 
 pub trait CommandExt {
-  // The `pipe` function sets the stdout and stderr to properly
-  // show the command output in the Node.js wrapper.
+  // The `pipe` function sets the stdout and stderr to properly show the command output in the Node.js wrapper.
   fn piped(&mut self) -> std::io::Result<ExitStatus>;
   fn output_ok(&mut self) -> crate::Result<Output>;
 }
@@ -49,10 +46,7 @@ impl CommandExt for Command {
     let program = self.get_program().to_string_lossy().into_owned();
     log::debug!(action = "Running"; "Command `{} {}`", program, self.get_args().map(|arg| arg.to_string_lossy()).fold(String::new(), |acc, arg| format!("{acc} {arg}")));
 
-    // Nothing run this way can answer a prompt, so no stdin rather than the
-    // inherited one: under the Node.js CLI that descriptor is close-on-exec
-    // and the child would start with fd 0 closed, which actool cannot take
-    // (#15315).
+    // Nothing run this way can answer a prompt, so no stdin rather than the inherited one: under the Node.js CLI that descriptor is close-on-exec and the child would start with fd 0 closed, which actool cannot take (#15315).
     self.stdin(Stdio::null());
     self.stdout(Stdio::piped());
     self.stderr(Stdio::piped());
@@ -121,6 +115,27 @@ mod tests {
   use tauri_utils::resources::resource_relpath;
 
   use super::is_retina;
+
+  #[cfg(unix)]
+  #[test]
+  fn captured_commands_receive_empty_stdin() {
+    use std::{
+      io::{Seek, Write},
+      process::Command,
+    };
+
+    use super::CommandExt;
+
+    let mut stdin = tempfile::tempfile().unwrap();
+    stdin.write_all(b"unexpected input\n").unwrap();
+    stdin.rewind().unwrap();
+
+    Command::new("sh")
+      .args(["-c", "test -r /dev/stdin && ! read -r line"])
+      .stdin(stdin)
+      .output_ok()
+      .expect("captured commands should receive readable, empty stdin");
+  }
 
   #[test]
   fn retina_icon_paths() {
